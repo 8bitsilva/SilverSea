@@ -16,6 +16,7 @@ Open **SilverSea-Setup.exe**, choose where to install the app, and follow the pr
 - Keep your games together in your library, including games already installed on your PC.
 - Launch supported installed games from SilverSea.
 - Connect Discord to sync your profile and share your current SilverSea activity.
+- Check for app updates from Profile settings.
 
 Closing the app window keeps SilverSea in the system tray so downloads can continue. Choose **Quit and save downloads** from the tray menu when you want to fully close the app.
 

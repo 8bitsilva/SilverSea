@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const fetch = require("cross-fetch");
 const { ElectronBlocker } = require("@cliqz/adblocker-electron");
+const { autoUpdater } = require("electron-updater");
 
 // Keep the existing profile folder so upgrades retain the database, Discord
 // session, and resumable aria2 state after the product rename.
@@ -45,6 +46,23 @@ let tray;
 let isQuitting = false;
 let shutdownComplete = false;
 let adBlocker = null;
+let updateStatus = { state: "idle", version: app.getVersion(), progress: 0, message: "" };
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.allowPrerelease = false;
+
+function publishUpdateStatus(nextStatus) {
+  updateStatus = { ...updateStatus, ...nextStatus };
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("update-status", updateStatus);
+}
+
+autoUpdater.on("checking-for-update", () => publishUpdateStatus({ state: "checking", message: "Checking for updates…" }));
+autoUpdater.on("update-available", (info) => publishUpdateStatus({ state: "downloading", version: info.version, progress: 0, message: `Downloading version ${info.version}…` }));
+autoUpdater.on("update-not-available", (info) => publishUpdateStatus({ state: "current", version: info.version || app.getVersion(), progress: 0, message: "SilverSea is up to date." }));
+autoUpdater.on("download-progress", (progress) => publishUpdateStatus({ state: "downloading", progress: Math.round(progress.percent), message: `Downloading update… ${Math.round(progress.percent)}%` }));
+autoUpdater.on("update-downloaded", (info) => publishUpdateStatus({ state: "downloaded", version: info.version, progress: 100, message: `Version ${info.version} is ready to install.` }));
+autoUpdater.on("error", (error) => publishUpdateStatus({ state: "error", message: error.message || "Could not check for updates." }));
 
 if (process.platform === "win32") {
   app.commandLine.appendSwitch("disable-direct-composition");
@@ -66,6 +84,9 @@ app.whenReady().then(async () => {
   setupInstalledGamesIPC(ipcMain, () => mainWindow);
   setupAria2IPC(ipcMain, () => adBlocker);
   setupDiscordIPC(ipcMain, () => mainWindow);
+  if (app.isPackaged) {
+    setTimeout(() => autoUpdater.checkForUpdates().catch((error) => publishUpdateStatus({ state: "error", message: error.message })), 8000);
+  }
 
 // Background processes
   startAria2().then((started) => {
@@ -160,6 +181,24 @@ ipcMain.handle("select-directory", async () => {
     properties: ["openDirectory"],
   });
   return r.canceled ? null : r.filePaths[0];
+});
+
+ipcMain.handle("get-app-version", () => app.getVersion());
+ipcMain.handle("get-update-status", () => updateStatus);
+ipcMain.handle("check-for-updates", async () => {
+  if (!app.isPackaged) return { ...updateStatus, state: "unavailable", message: "Updates are available in the installed version." };
+  try {
+    publishUpdateStatus({ state: "checking", message: "Checking for updates…" });
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    publishUpdateStatus({ state: "error", message: error.message || "Could not check for updates." });
+  }
+  return updateStatus;
+});
+ipcMain.handle("install-update", () => {
+  if (updateStatus.state !== "downloaded") return false;
+  autoUpdater.quitAndInstall();
+  return true;
 });
 
 ipcMain.on("open-external", (event, url) => {

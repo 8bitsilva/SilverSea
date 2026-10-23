@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Download,
   Compass,
   Heart,
   Library,
@@ -70,13 +69,13 @@ export default function Sidebar({
   return (
     <aside className="silver-sidebar flex h-full w-[244px] shrink-0 flex-col bg-[#111] text-white">
       <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-5">
-        <div className="silver-brand-mark grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.12)]">
-          <Download size={20} strokeWidth={2.2} />
+        <div className="silver-brand-mark h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,.12)]">
+          <img src="/silver-mascot.png" alt="SilverSea" className="h-full w-full object-cover" />
         </div>
         <div className="leading-tight">
-          <div className="silver-brand-wordmark text-[15px] font-bold tracking-tight">Silver</div>
+          <div className="silver-brand-wordmark text-[15px] font-bold tracking-tight">SilverSea</div>
           <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
-            Downloader
+            GAME LIBRARY
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   UserRound, Image as ImageIcon, HardDrive, Gamepad2, Search, LoaderCircle,
   Plus, Check, MonitorDown, Library, FolderSearch,
+  RefreshCw, ArrowDownToLine, CheckCircle2,
 } from "lucide-react";
 
 function normalized(value) {
@@ -28,8 +29,19 @@ export default function ProfileSettings({
   const [importingGames, setImportingGames] = useState(false);
   const [discordBusy, setDiscordBusy] = useState(false);
   const [discordError, setDiscordError] = useState("");
+  const [appVersion, setAppVersion] = useState("");
+  const [updateStatus, setUpdateStatus] = useState({ state: "idle", progress: 0, message: "" });
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useEffect(() => setDraftName(profile?.name || ""), [profile?.name]);
+
+  useEffect(() => {
+    let mounted = true;
+    window.api.getAppVersion().then((version) => { if (mounted) setAppVersion(version); });
+    window.api.getUpdateStatus().then((status) => { if (mounted) setUpdateStatus(status); });
+    window.api.onUpdateStatus((status) => { if (mounted) setUpdateStatus(status); });
+    return () => { mounted = false; };
+  }, []);
 
   const availableGames = useMemo(() => {
     const names = new Set(library.map((game) => normalized(game.name)));
@@ -80,6 +92,12 @@ export default function ProfileSettings({
     } finally {
       setDiscordBusy(false);
     }
+  };
+
+  const handleUpdateCheck = async () => {
+    setCheckingUpdate(true);
+    try { setUpdateStatus(await window.api.checkForUpdates()); }
+    finally { setCheckingUpdate(false); }
   };
 
   const handleScanInstalledGames = async () => {
@@ -276,6 +294,30 @@ export default function ProfileSettings({
           <button type="button" onClick={handleDirectorySelect} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-xs font-semibold text-white/80">
             <HardDrive size={14} /> Change folder
           </button>
+        </div>
+      </section>
+
+      <section className="border-t border-white/[0.09] py-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.045] text-white/70"><ArrowDownToLine size={18} /></div>
+            <div>
+              <h2 className="text-base font-semibold text-white">SilverSea updates</h2>
+              <p className="mt-1 text-xs text-white/45">Version {appVersion || "—"} · {updateStatus.message || "You’ll be notified when an update is ready."}</p>
+              {updateStatus.state === "downloading" && <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-slate-200 transition-[width]" style={{ width: `${Math.max(0, Math.min(100, updateStatus.progress || 0))}%` }} /></div>}
+              {updateStatus.state === "current" && <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-white/50"><CheckCircle2 size={13} /> Up to date</p>}
+              {updateStatus.state === "error" && <p role="status" className="mt-2 text-[11px] text-red-200">{updateStatus.message}</p>}
+            </div>
+          </div>
+          {updateStatus.state === "downloaded" ? (
+            <button type="button" onClick={() => window.api.installUpdate()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-950">
+              <RefreshCw size={14} /> Restart to update
+            </button>
+          ) : (
+            <button type="button" onClick={handleUpdateCheck} disabled={checkingUpdate || updateStatus.state === "downloading"} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/80 disabled:opacity-50">
+              <RefreshCw size={14} className={checkingUpdate ? "animate-spin" : ""} /> {checkingUpdate ? "Checking…" : updateStatus.state === "downloading" ? "Downloading…" : "Check for updates"}
+            </button>
+          )}
         </div>
       </section>
 

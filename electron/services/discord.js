@@ -11,7 +11,7 @@ const CALLBACK_PORT = 43122;
 const REDIRECT_URI = `http://${CALLBACK_HOST}:${CALLBACK_PORT}/discord/callback`;
 const OAUTH_API = "https://discord.com/api/v10";
 const APP_CLIENT_ID = "1558920296210239498";
-const DEFAULT_STATE = { clientId: APP_CLIENT_ID, clientSecret: "", accessToken: "", refreshToken: "", expiresAt: 0, user: null, presenceEnabled: true };
+const DEFAULT_STATE = { clientId: APP_CLIENT_ID, accessToken: "", refreshToken: "", expiresAt: 0, user: null, presenceEnabled: true };
 
 let state = { ...DEFAULT_STATE };
 let callbackServer = null;
@@ -31,18 +31,6 @@ function statePath() {
   return path.join(app.getPath("userData"), "discord-secure.json");
 }
 
-function readConfiguredClientSecret() {
-  if (process.env.SILVER_DISCORD_CLIENT_SECRET) return process.env.SILVER_DISCORD_CLIENT_SECRET.trim();
-  try {
-    const envFile = fs.readFileSync(path.join(app.getAppPath(), ".env.local"), "utf8");
-    const match = envFile.match(/^\s*SILVER_DISCORD_CLIENT_SECRET\s*=\s*(.*?)\s*$/m);
-    if (!match) return "";
-    return match[1].replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, (_whole, doubleQuoted, singleQuoted) => doubleQuoted ?? singleQuoted);
-  } catch {
-    return "";
-  }
-}
-
 function loadState() {
   if (!safeStorage.isEncryptionAvailable()) return;
   let stored = {};
@@ -52,10 +40,11 @@ function loadState() {
   } catch (error) {
     if (error.code !== "ENOENT") console.error("[Discord] Could not load encrypted settings:", error.message);
   }
-  const configuredSecret = readConfiguredClientSecret();
-  state = { ...DEFAULT_STATE, ...stored, clientId: APP_CLIENT_ID, clientSecret: configuredSecret || stored.clientSecret || "" };
-  if (configuredSecret && stored.clientSecret !== configuredSecret) {
-    try { saveState(); } catch (error) { console.warn("[Discord] Could not store the app credential securely:", error.message); }
+  // Public desktop OAuth uses PKCE; never persist or ship the app secret.
+  state = { ...DEFAULT_STATE, ...stored, clientId: APP_CLIENT_ID };
+  delete state.clientSecret;
+  if (stored.clientSecret) {
+    try { saveState(); } catch (error) { console.warn("[Discord] Could not remove the old saved app secret:", error.message); }
   }
 }
 
@@ -67,7 +56,7 @@ function saveState() {
 
 function publicStatus(error = "") {
   return {
-    configured: Boolean(state.clientId && state.clientSecret),
+    configured: /^\d{17,20}$/.test(String(state.clientId || "")),
     connected: Boolean(state.user),
     user: state.user,
     clientId: state.clientId,
@@ -92,7 +81,7 @@ function syncDiscordProfile() {
 }
 
 async function exchangeToken(fields) {
-  const body = new URLSearchParams({ ...fields, client_id: state.clientId, client_secret: state.clientSecret });
+  const body = new URLSearchParams({ ...fields, client_id: state.clientId });
   const response = await fetch(`${OAUTH_API}/oauth2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -101,7 +90,7 @@ async function exchangeToken(fields) {
   const payload = await response.json();
   if (!response.ok) {
     if (payload.error === "invalid_client") {
-      throw new Error("Discord rejected SilverSea's app credentials (invalid_client). Check that the configured application is correct.");
+      throw new Error("Discord rejected SilverSea's application ID. Check the Discord application configured for this release.");
     }
     throw new Error(payload.error_description || payload.error || `Discord token request failed (${response.status}).`);
   }
@@ -138,11 +127,13 @@ function sendCallbackPage(response, success, message) {
 
 async function beginLogin() {
   if (!safeStorage.isEncryptionAvailable()) throw new Error("Secure credential storage is unavailable on this device.");
-  if (!/^\d{17,20}$/.test(String(state.clientId || "").trim()) || !state.clientSecret) {
-    throw new Error("Discord sign-in is not configured for this SilverSea build.");
+  if (!/^\d{17,20}$/.test(String(state.clientId || "").trim())) {
+    throw new Error("SilverSea’s Discord application ID is invalid.");
   }
   closeCallbackServer();
-  pendingOAuth = { state: crypto.randomBytes(24).toString("hex") };
+  const codeVerifier = crypto.randomBytes(32).toString("base64url");
+  const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+  pendingOAuth = { state: crypto.randomBytes(24).toString("hex"), codeVerifier };
   callbackServer = http.createServer(async (request, response) => {
     const url = new URL(request.url, `http://${CALLBACK_HOST}:${CALLBACK_PORT}`);
     if (url.pathname !== "/discord/callback") {
@@ -178,7 +169,7 @@ async function beginLogin() {
     }
 
     try {
-      const token = await exchangeToken({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI });
+      const token = await exchangeToken({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI, code_verifier: pendingOAuth.codeVerifier });
       state.accessToken = token.access_token;
       state.refreshToken = token.refresh_token || "";
       state.expiresAt = Date.now() + Number(token.expires_in || 0) * 1000;
@@ -221,6 +212,8 @@ async function beginLogin() {
     scope: "identify",
     redirect_uri: REDIRECT_URI,
     state: pendingOAuth.state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   }).toString();
   try {
     await shell.openExternal(authorize.toString());

@@ -1,13 +1,14 @@
 {
   "name": "silversea",
   "private": true,
-  "version": "0.1.7",
+  "version": "0.1.8",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:electron": "vite build && electron-builder",
     "package:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "release:win": "npm run build && electron-builder --win nsis --x64 --publish always",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -20,6 +21,7 @@
     "axios": "^1.16.0",
     "cheerio": "^1.2.0",
     "cross-fetch": "^4.1.0",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
     "postcss": "^8.5.14",
@@ -64,6 +66,7 @@
       "aria2c-linux"
     ],
     "win": {
+      "icon": "public/silver-sea.ico",
       "target": [
         {
           "target": "nsis",
@@ -73,6 +76,14 @@
         }
       ]
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "8bitsilva",
+        "repo": "SilverSea",
+        "releaseType": "release"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": true,

@@ -33,6 +33,14 @@ contextBridge.exposeInMainWorld("api", {
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   chooseGameInstallFolder: (gameName, requiredBytes) => ipcRenderer.invoke("choose-game-install-folder", { gameName, requiredBytes }),
   getDB: () => ipcRenderer.invoke("get-db"),
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
+  getUpdateStatus: () => ipcRenderer.invoke("get-update-status"),
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  installUpdate: () => ipcRenderer.invoke("install-update"),
+  onUpdateStatus: (callback) => {
+    ipcRenderer.removeAllListeners("update-status");
+    ipcRenderer.on("update-status", (_event, status) => callback(status));
+  },
   updateProfile: (profile) => ipcRenderer.invoke("update-profile", profile),
   getDiscordStatus: () => ipcRenderer.invoke("get-discord-status"),
   connectDiscord: () => ipcRenderer.invoke("connect-discord"),
