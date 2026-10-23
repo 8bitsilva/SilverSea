@@ -24,6 +24,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Ensure tag matches app version
+        id: app-version
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
@@ -31,6 +32,7 @@ jobs:
           if ($env:GITHUB_REF_NAME -ne $expected) {
             throw "Tag $env:GITHUB_REF_NAME does not match package version $expected"
           }
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build Windows setup
         shell: pwsh
@@ -42,26 +44,15 @@ jobs:
           npx electron-builder --win nsis --x64 --publish never
 
       - name: Publish setup and customer release notes
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          $version = node -p "require('./package.json').version"
-          $notesPath = Join-Path $env:GITHUB_WORKSPACE ".github\release-notes\$tag.md"
-          $setup = Join-Path $env:GITHUB_WORKSPACE "release-installer\SilverSea-Setup.exe"
-          $latest = Join-Path $env:GITHUB_WORKSPACE "release-installer\latest.yml"
-          $blockmap = Join-Path $env:GITHUB_WORKSPACE "release-installer\SilverSea-Setup.exe.blockmap"
-          foreach ($asset in @($setup, $latest, $blockmap)) {
-            if (-not (Test-Path -LiteralPath $asset)) { throw "Release asset not found: $asset" }
-          }
-
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $setup $latest $blockmap --repo $env:GITHUB_REPOSITORY --clobber
-            if ($LASTEXITCODE -ne 0) { throw "Could not upload setup assets for $tag" }
-            gh release edit $tag --repo $env:GITHUB_REPOSITORY --title "SilverSea $version" --notes-file $notesPath
-          } else {
-            gh release create $tag $setup $latest $blockmap --repo $env:GITHUB_REPOSITORY --title "SilverSea $version" --notes-file $notesPath
-          }
-          if ($LASTEXITCODE -ne 0) { throw "Could not publish the SilverSea release $tag" }
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: SilverSea ${{ steps.app-version.outputs.version }}
+          body_path: .github/release-notes/${{ github.ref_name }}.md
+          files: |
+            release-installer/SilverSea-Setup.exe
+            release-installer/latest.yml
+            release-installer/SilverSea-Setup.exe.blockmap
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          make_latest: true
