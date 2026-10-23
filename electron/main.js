@@ -64,11 +64,6 @@ autoUpdater.on("download-progress", (progress) => publishUpdateStatus({ state: "
 autoUpdater.on("update-downloaded", (info) => publishUpdateStatus({ state: "downloaded", version: info.version, progress: 100, message: `Version ${info.version} is ready to install.` }));
 autoUpdater.on("error", (error) => publishUpdateStatus({ state: "error", message: error.message || "Could not check for updates." }));
 
-if (process.platform === "win32") {
-  app.commandLine.appendSwitch("disable-direct-composition");
-  app.commandLine.appendSwitch("disable-direct-composition-video-overlays");
-}
-
 app.whenReady().then(async () => {
   console.log("[App] Ready initializing modules...");
 
