@@ -6,7 +6,9 @@ import {
   ListFilter,
   Plus,
   Settings2,
+  Download,
 } from "lucide-react";
+import silverMascot from "../../assets/silver-mascot.png";
 
 const primaryNav = [
   { id: "browse", label: "Discover", icon: Compass },
@@ -70,7 +72,7 @@ export default function Sidebar({
     <aside className="silver-sidebar flex h-full w-[244px] shrink-0 flex-col bg-[#111] text-white">
       <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-5">
         <div className="silver-brand-mark h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,.12)]">
-          <img src="/silver-mascot.png" alt="SilverSea" className="h-full w-full object-cover" />
+          <img src={silverMascot} alt="SilverSea" className="h-full w-full object-cover" />
         </div>
         <div className="leading-tight">
           <div className="silver-brand-wordmark text-[15px] font-bold tracking-tight">SilverSea</div>
