@@ -32,39 +32,36 @@ jobs:
             throw "Tag $env:GITHUB_REF_NAME does not match package version $expected"
           }
 
-      - name: Build and publish Windows setup
+      - name: Build Windows setup
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $notesPath = Join-Path $env:GITHUB_WORKSPACE ".github\release-notes\$tag.md"
+          if (-not (Test-Path -LiteralPath $notesPath)) { throw "Release notes not found: $notesPath" }
+          npm run build
+          npx electron-builder --win nsis --x64 --publish never
+
+      - name: Publish setup and customer release notes
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = $env:GITHUB_REF_NAME
           $version = node -p "require('./package.json').version"
           $notesPath = Join-Path $env:GITHUB_WORKSPACE ".github\release-notes\$tag.md"
-          if (-not (Test-Path -LiteralPath $notesPath)) { throw "Release notes not found: $notesPath" }
-          npm run build
-          npx electron-builder --win nsis --x64 --publish always `
-            "-c.releaseInfo.releaseName=SilverSea $version" `
-            "-c.releaseInfo.releaseNotesFile=$notesPath"
+          $setup = Join-Path $env:GITHUB_WORKSPACE "release-installer\SilverSea-Setup.exe"
+          $latest = Join-Path $env:GITHUB_WORKSPACE "release-installer\latest.yml"
+          $blockmap = Join-Path $env:GITHUB_WORKSPACE "release-installer\SilverSea-Setup.exe.blockmap"
+          foreach ($asset in @($setup, $latest, $blockmap)) {
+            if (-not (Test-Path -LiteralPath $asset)) { throw "Release asset not found: $asset" }
+          }
 
-      - name: Publish customer release notes
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const tag = process.env.GITHUB_REF_NAME;
-            const version = tag.replace(/^v/, '');
-            const notesPath = `.github/release-notes/${tag}.md`;
-            const notes = fs.readFileSync(notesPath, 'utf8');
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag,
-            });
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id,
-              name: `SilverSea ${version}`,
-              body: notes,
-            });
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup $latest $blockmap --repo $env:GITHUB_REPOSITORY --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Could not upload setup assets for $tag" }
+            gh release edit $tag --repo $env:GITHUB_REPOSITORY --title "SilverSea $version" --notes-file $notesPath
+          } else {
+            gh release create $tag $setup $latest $blockmap --repo $env:GITHUB_REPOSITORY --title "SilverSea $version" --notes-file $notesPath
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Could not publish the SilverSea release $tag" }
