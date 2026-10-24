@@ -267,6 +267,7 @@ export default function App() {
                 {currentView === "downloads" && (
                   <DownloadsView
                     activeDownloads={activeDownloads}
+                    onRemoveDownload={(gid) => setActiveDownloads((current) => current.filter((download) => download.gid !== gid))}
                     completedDownloads={completedDownloads}
                     setCompletedDownloads={setCompletedDownloads}
                     currentTheme={currentTheme}

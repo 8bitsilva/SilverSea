@@ -77,7 +77,7 @@ app.whenReady().then(async () => {
   setupExtensionsIPC(ipcMain);
   setupLauncherIPC(ipcMain, () => mainWindow);
   setupInstalledGamesIPC(ipcMain, () => mainWindow);
-  setupAria2IPC(ipcMain, () => adBlocker);
+  setupAria2IPC(ipcMain, () => adBlocker, () => mainWindow);
   setupDiscordIPC(ipcMain, () => mainWindow);
   if (app.isPackaged) {
     setTimeout(() => autoUpdater.checkForUpdates().catch((error) => publishUpdateStatus({ state: "error", message: error.message })), 8000);

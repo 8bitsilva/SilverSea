@@ -264,7 +264,9 @@ body,
 .download-controls { display: flex; gap: 6px; margin-left: 5px; }
 .download-controls button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(255,255,255,.04); color: #c4c9d0; }
 .download-controls button:hover { background: rgba(255,255,255,.1); color: white; }
+.download-controls button:disabled { cursor: wait; opacity: .55; }
 .download-controls .download-cancel:hover { border-color: rgba(255,110,110,.24); background: rgba(160,48,48,.18); color: #ff9b9b; }
+.download-remove-error { margin: 10px 0 0 42px; color: #ff9b9b; font-size: 12px; }
 .download-progress-row { display: flex; align-items: center; gap: 12px; margin-top: 17px; }
 .download-progress-row > strong { width: 46px; color: #d2d6dc; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 .download-progress-track { height: 5px; flex: 1; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.09); }

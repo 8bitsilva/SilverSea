@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session } = require("electron");
+const { app, BrowserWindow, session, dialog } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -13,6 +13,7 @@ let aria2;
 const activeGameMap = new Map();
 let sessionFilePath;
 let labelsFilePath;
+const cancellingDownloads = new Set();
 
 function loadDownloadLabels() {
   labelsFilePath = path.join(app.getPath("userData"), "aria2-download-labels.json");
@@ -178,7 +179,7 @@ function startPolling(getMainWindow) {
       const active = await aria2.call("tellActive");
       const waiting = await aria2.call("tellWaiting", 0, 100);
       const stopped = await aria2.call("tellStopped", 0, 100);
-      const completed = stopped.filter((d) => d.status === "complete");
+      const completed = stopped.filter((d) => d.status === "complete" && !cancellingDownloads.has(d.gid));
 
       if (completed.length > 0) {
         let db = getDB();
@@ -261,7 +262,7 @@ function startPolling(getMainWindow) {
         }
       }
 
-      const downloadState = [...active, ...waiting].map((d) => {
+      const downloadState = [...active, ...waiting].filter((d) => !cancellingDownloads.has(d.gid)).map((d) => {
           let name = d.files[0]?.path?.split(/[/\\]/).pop() || "Resolving...";
           if (d.bittorrent && d.bittorrent.info && d.bittorrent.info.name) {
             name = d.bittorrent.info.name;
@@ -298,7 +299,7 @@ function startPolling(getMainWindow) {
   }, 1000);
 }
 
-function setupAria2IPC(ipcMain, getAdBlocker) {
+function setupAria2IPC(ipcMain, getAdBlocker, getMainWindow = () => null) {
   ipcMain.handle(
     "pause-download",
     async (e, gid) => await aria2.call("pause", gid),
@@ -307,21 +308,46 @@ function setupAria2IPC(ipcMain, getAdBlocker) {
     "resume-download",
     async (e, gid) => await aria2.call("unpause", gid),
   );
-  ipcMain.handle("cancel-download", async (e, gid) => {
+  ipcMain.handle("cancel-download", async (_event, gid) => {
+    const mainWindow = getMainWindow();
+    const options = {
+      type: "question",
+      title: "Remove download?",
+      message: "Do you also want to delete the files downloaded so far?",
+      detail: "Keeping the files leaves them on your drive. Deleting removes partial files and their resume data.",
+      buttons: ["Delete files and remove", "Keep files and remove", "Cancel"],
+      defaultId: 1,
+      cancelId: 2,
+      noLink: true,
+    };
+    const result = mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showMessageBox(mainWindow, options)
+      : await dialog.showMessageBox(options);
+    if (result.response === 2) return { cancelled: true };
+
+    cancellingDownloads.add(gid);
     try {
       const status = await aria2.call("tellStatus", gid);
       await aria2.call("forceRemove", gid);
       activeGameMap.delete(gid);
       persistDownloadLabels();
-      if (status && status.files) {
-        status.files.forEach((f) => {
-          if (f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
-          const ariaFile = f.path + ".aria2";
-          if (fs.existsSync(ariaFile)) fs.unlinkSync(ariaFile);
-        });
+      if (result.response === 0 && status?.files) {
+        const filesToDelete = status.files.flatMap((file) => file.path ? [file.path, `${file.path}.aria2`] : []);
+        await Promise.allSettled(filesToDelete.map(async (filePath) => {
+          try {
+            await fs.promises.unlink(filePath);
+          } catch (error) {
+            if (error.code !== "ENOENT") throw error;
+          }
+        }));
       }
+      try { await aria2.call("removeDownloadResult", gid); } catch {}
+      cancellingDownloads.delete(gid);
+      return { cancelled: false, removed: true };
     } catch (err) {
+      cancellingDownloads.delete(gid);
       console.error("Cancel Error:", err);
+      throw new Error(`Could not remove download: ${err.message}`);
     }
   });
 

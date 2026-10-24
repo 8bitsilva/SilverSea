@@ -60,9 +60,11 @@ function Stat({ icon: Icon, label, value }) {
   );
 }
 
-export default function DownloadsView({ activeDownloads, completedDownloads, setCompletedDownloads }) {
+export default function DownloadsView({ activeDownloads, onRemoveDownload, completedDownloads, setCompletedDownloads }) {
   const [expandedGids, setExpandedGids] = useState(new Set());
   const [speedHistory, setSpeedHistory] = useState({});
+  const [removingGids, setRemovingGids] = useState(new Set());
+  const [removeErrors, setRemoveErrors] = useState({});
 
   useEffect(() => {
     setSpeedHistory((previous) => {
@@ -86,6 +88,23 @@ export default function DownloadsView({ activeDownloads, completedDownloads, set
     else next.add(gid);
     return next;
   });
+
+  const removeDownload = async (gid) => {
+    setRemovingGids((previous) => new Set(previous).add(gid));
+    setRemoveErrors((previous) => ({ ...previous, [gid]: "" }));
+    try {
+      const result = await window.api.cancelDownload(gid);
+      if (!result?.cancelled) onRemoveDownload?.(gid);
+    } catch (error) {
+      setRemoveErrors((previous) => ({ ...previous, [gid]: error.message || "Could not remove this download." }));
+    } finally {
+      setRemovingGids((previous) => {
+        const next = new Set(previous);
+        next.delete(gid);
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="downloads-page">
@@ -141,7 +160,7 @@ export default function DownloadsView({ activeDownloads, completedDownloads, set
                       ) : (
                         <button type="button" aria-label="Pause download" title="Pause" onClick={() => window.api.pauseDownload(download.gid)}><Pause size={16} /></button>
                       )}
-                      <button type="button" className="download-cancel" aria-label="Cancel download" title="Cancel" onClick={() => window.api.cancelDownload(download.gid)}><X size={16} /></button>
+                      <button type="button" className="download-cancel" aria-label="Remove download" title={removingGids.has(download.gid) ? "Removing…" : "Remove download"} disabled={removingGids.has(download.gid)} onClick={() => removeDownload(download.gid)}><X size={16} /></button>
                     </div>
                   </div>
 
@@ -173,6 +192,7 @@ export default function DownloadsView({ activeDownloads, completedDownloads, set
                       })}</div>}
                     </div>
                   )}
+                  {removeErrors[download.gid] && <p className="download-remove-error" role="alert">{removeErrors[download.gid]}</p>}
                 </article>
               );
             })}
