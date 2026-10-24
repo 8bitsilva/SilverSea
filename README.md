@@ -8,6 +8,12 @@ SilverSea brings your game catalogue, library, and downloads together in one des
 
 Open **SilverSea-Setup.exe**, choose where to install the app, and follow the prompts. When setup is finished, start SilverSea from your desktop or Start menu.
 
+You can also download and open the latest setup from PowerShell:
+
+```powershell
+$installer = Join-Path $env:TEMP 'SilverSea-Setup.exe'; irm 'https://github.com/8bitsilva/SilverSea/releases/latest/download/SilverSea-Setup.exe' -OutFile $installer; Start-Process $installer
+```
+
 ## What you can do
 
 - Browse games and view their details, screenshots, and download options.
