@@ -23,3 +23,32 @@ Closing the app window keeps SilverSea in the system tray so downloads can conti
 ## Need help?
 
 If setup or a download does not work, open an issue in the [SilverSea project](https://github.com/8bitsilva/SilverSea/issues) and include what happened and which version you are using.
+
+## Screenshots
+
+See SilverSea in action:
+
+### Discover
+
+![Browse the game catalogue](public/release-screenshots/discover-games.png)
+
+![Discover picks](public/release-screenshots/discover-picks.png)
+
+### Game details and install
+
+![Game details for 007 First Light](public/release-screenshots/game-details-007-first-light.png)
+
+![Game details and launcher controls](public/release-screenshots/game-launcher.png)
+
+![Review the install location and disk space](public/release-screenshots/install-preview.png)
+
+### Your games
+
+![Your game library](public/release-screenshots/library.png)
+
+![Find installed games](public/release-screenshots/installed-games.png)
+
+### Downloads
+
+![Track download speed, progress, and files](public/release-screenshots/downloads.png)
+
